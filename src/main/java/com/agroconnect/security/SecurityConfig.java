@@ -30,7 +30,7 @@ public class SecurityConfig {
             // (see application.properties). Re-enable CSRF tokens before a real production launch.
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/index.html", "/register.html", "/css/**", "/js/**",
+                .requestMatchers("/", "/index.html", "/login.html", "/register.html", "/css/**", "/js/**",
                         "/images/**", "/favicon.ico", "/error",
                         "/api/health", "/api/auth/login", "/api/auth/register").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
@@ -52,7 +52,7 @@ public class SecurityConfig {
                         res.setContentType("application/json");
                         res.getWriter().write("{\"code\":\"UNAUTHENTICATED\",\"message\":\"Please log in\"}");
                     } else {
-                        res.sendRedirect("/index.html");
+                        res.sendRedirect("/login.html");
                     }
                 })
                 // Logged in but wrong role

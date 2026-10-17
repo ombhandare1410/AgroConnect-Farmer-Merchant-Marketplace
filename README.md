@@ -25,7 +25,7 @@ Requirements: JDK 17, Maven 3.9+, MySQL 8 running locally, an IDE with the Lombo
 | Farmer | `farmer.html` (find merchants, my fruit listings with photos), `meetings.html`, `deals.html`, `profile.html?id=`, `myprofile.html` |
 | Merchant | `merchant.html` (my requirements, find farmers), `meetings.html`, `deals.html`, `profile.html?id=`, `myprofile.html` |
 | Admin | `admin.html` (summary, fruit categories, user accounts, review reports, admin activity log) |
-Public: `index.html` (login), `register.html`. All other pages and APIs are protected on the **backend** by role.
+Public: `index.html` (home), `login.html` (sign in), `register.html`. All other pages and APIs are protected on the **backend** by role.
 
 ## What it does
 * **Accounts:** register/login/logout (BCrypt, session cookie), language saved per account, edit own profile.

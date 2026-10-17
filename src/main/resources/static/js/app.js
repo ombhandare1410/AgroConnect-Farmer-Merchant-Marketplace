@@ -25,7 +25,7 @@ const homeFor=role=>({FARMER:"farmer.html",MERCHANT:"merchant.html",ADMIN:"admin
 // Call at the top of every protected page. Returns true if the right user is logged in.
 async function initPage(role){
   const r=await api("/api/auth/me");
-  if(!r.ok){location.href="index.html";return false;}
+  if(!r.ok){location.href="login.html";return false;}
   me=r.data;
   const allowed=Array.isArray(role)?role.includes(me.role):me.role===role;
   if(!allowed){location.href=homeFor(me.role);return false;}
@@ -34,7 +34,7 @@ async function initPage(role){
   localStorage.setItem("lang",me.preferredLanguage.toLowerCase());
   applyLang();return true;
 }
-async function logout(){await api("/api/auth/logout","POST");location.href="index.html";}
+async function logout(){await api("/api/auth/logout","POST");location.href="login.html";}
 // ---------- Header
 function buildHeader(){
   const h=$("hdr");if(!h)return;
