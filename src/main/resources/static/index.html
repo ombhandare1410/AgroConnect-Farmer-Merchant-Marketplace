@@ -1,0 +1,30 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroConnect - Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"></head><body>
+<header id="hdr"></header>
+<main class="auth">
+ <h1>🌿 AgroConnect</h1>
+ <p><strong data-i18n="tagline"></strong><br><span class="muted" data-i18n="welcome"></span></p>
+ <div class="card">
+  <form id="f" novalidate>
+   <div class="field"><label for="em" data-i18n="email"></label><input id="em" type="email" autocomplete="email" required></div>
+   <div class="field"><label for="pw" data-i18n="password"></label><input id="pw" type="password" autocomplete="current-password" required></div>
+   <button class="btn" type="submit" data-i18n="login"></button>
+   <div id="msg" class="msg hide" role="alert"></div>
+  </form>
+  <p><a href="register.html" data-i18n="newHere"></a></p>
+ </div>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+// Already logged in? Go straight to the right dashboard.
+api("/api/auth/me").then(r=>{if(r.ok)location.href=homeFor(r.data.role);});
+$("f").addEventListener("submit",async e=>{
+  e.preventDefault();const m=$("msg");m.className="msg";
+  if(!$("em").value.trim()||!$("pw").value){m.textContent=t("required");return;}
+  const r=await api("/api/auth/login","POST",{email:$("em").value.trim(),password:$("pw").value});
+  if(r.ok){localStorage.setItem("lang",r.data.preferredLanguage.toLowerCase());location.href=homeFor(r.data.role);}
+  else m.textContent=errMsg(r);
+});
+</script></body></html>

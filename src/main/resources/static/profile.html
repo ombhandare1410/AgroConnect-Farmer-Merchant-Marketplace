@@ -1,0 +1,81 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><title>AgroConnect - Profile</title></head><body>
+<header id="hdr" data-role="auto"></header>
+<main>
+ <p><a href="#" onclick="history.back();return false" data-i18n="back"></a></p>
+ <div id="p"></div>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+let prof=null;
+function draw(){
+ const el=$("p");
+ if(!prof){el.innerHTML='<div class="empty">'+t("profileNotFound")+"</div>";return;}
+ const m=prof.role=="MERCHANT",s=prof.stats;
+ const subj=m?prof.requirements.map(r=>`<option value="${r.id}">${esc(catName(r.category))} · ${fmtKg(r.quantityKg)}</option>`).join("")
+  :prof.listings.map(l=>`<option value="${l.id}">${esc(catName(l.category))} · ${fmtKg(l.quantityKg)}</option>`).join("");
+ const rating=s.avgRating==null?t("noRatings"):stars(s.avgRating)+" / 5 ("+s.reviewCount+" "+t("reviews")+")";
+ el.innerHTML=`
+ <div class="card"><div class="phead">
+  <div><img src="${esc(avatarFor(prof.id,prof.avatarUrl))}" alt="${t("avatarNote")}"><br><span class="muted">${t("avatarNote")}</span></div>
+  <div><h1 style="margin:0">${esc(prof.displayName)}</h1>
+   ${m?`<p class="muted">${esc(prof.businessType||"")} · ${t("contactPerson")}: ${esc(prof.contactName)}</p>`
+      :`<p class="muted">${prof.farmName?esc(prof.farmName)+" · ":""}${esc(prof.contactName)}</p>`}
+   <p class="muted">${esc(prof.location)}</p><p>${rating}</p></div></div>
+  ${prof.description?`<p>${esc(prof.description)}</p>`:""}
+  <div class="kpis"><div class="kpi"><strong>${s.completedDeals}</strong>${t("deals")}</div>
+   <div class="kpi"><strong>${Number(s.totalKg).toLocaleString("en-IN")} ${t("kg")}</strong>${m?t("purchased"):t("suppliedLbl")}</div></div>
+  ${prof.phone?`<p><strong>${t("phoneLbl")}:</strong> <a href="tel:${esc(prof.phone)}">${esc(prof.phone)}</a><br><span class="muted">${t("phoneShown")}</span></p>`
+    :`<p class="muted">${t("phoneHidden")}</p>`}
+  <button class="btn" onclick="$('bform').classList.toggle('hide')">${t("bookAppt")}</button>
+  <div id="bform" class="hide" style="margin-top:.8rem">
+   <div class="formgrid">
+    <div><label for="bd1">${t("date")}</label><input id="bd1" type="date" min="${todayStr()}"></div>
+    <div><label for="bt1">${t("time")}</label><input id="bt1" type="time"></div>
+    <div><label for="bl1">${t("meetPlace")}</label><input id="bl1" maxlength="200"></div>
+    <div><label for="bs1">${t("aboutItem")}</label><select id="bs1"><option value="">—</option>${subj}</select></div>
+   </div>
+   <div class="field" style="margin-top:.6rem"><label for="bn1">${t("notes")}</label><input id="bn1" maxlength="300"></div>
+   <button class="btn" onclick="sendBooking()">${t("sendRequest")}</button>
+   <div id="bmsg" class="msg hide" role="alert"></div>
+  </div>
+  <p class="muted">${t("trustNote")}</p></div>
+ ${m?`<h2>${t("activeReqs")}</h2><div class="grid">${prof.requirements.length?prof.requirements.map(r=>`
+   <div class="card"><strong>${esc(catName(r.category))}</strong>${r.variety?" · "+esc(r.variety):""}<br>
+   ${t("qty")}: ${fmtKg(r.quantityKg)}<br>${t("target")}: ${price(r.targetPriceMin,r.targetPriceMax)}
+   ${r.qualityGrade?"<br>"+t("quality")+": "+esc(r.qualityGrade):""}</div>`).join(""):`<div class="empty">${t("emptyReqs")}</div>`}</div>`
+  :`<h2>${t("listingsTitle")}</h2><div class="grid">${prof.listings.length?prof.listings.map(l=>`
+   <div class="card"><strong>${esc(catName(l.category))}</strong>${l.variety?" · "+esc(l.variety):""}${thumbs(l.images)}
+   <p>${t("qty")}: ${fmtKg(l.quantityKg)}<br>${t("expected")}: ₹${l.expectedPricePerKg}/${t("kg")}
+   ${l.qualityGrade?"<br>"+t("quality")+": "+esc(l.qualityGrade):""}</p></div>`).join(""):`<div class="empty">${t("emptyListings")}</div>`}</div>`}
+ <div class="tx" style="margin-top:1.2rem"><h2>${t("historyTitle")}</h2>
+  ${prof.history.length?`<div class="wrap"><table><tr><th>${t("fruit")}</th><th>${t("deals")}</th><th>${t("qty")}</th></tr>
+   ${prof.history.map(h=>`<tr><td>${esc(catName(h.category))}</td><td>${h.deals}</td><td>${fmtKg(h.totalKg)}</td></tr>`).join("")}</table></div>`
+   :`<div class="empty">${t("historyNone")}</div>`}</div>
+ <h2>${t("reviewsTitle")}</h2>
+ ${prof.reviews.length?prof.reviews.map(r=>`<div class="card" style="margin-bottom:.6rem"><span class="stars">${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</span>
+   <strong> ${esc(r.reviewerName)}</strong><br>${esc(r.comment||"")}<br><span class="muted">${esc((r.createdAt||"").slice(0,10))}</span> <a href="#" onclick="reportReview(${r.id});return false">${t("report")}</a></div>`).join("")
+   :`<div class="empty">${t("noReviews")}</div>`}`;
+}
+async function sendBooking(){
+ const b=$("bmsg");b.className="msg";
+ if(!$("bd1").value||!$("bt1").value||!$("bl1").value.trim()){b.textContent=t("required");return;}
+ const body={otherUserId:prof.id,date:$("bd1").value,time:$("bt1").value,meetingLocation:$("bl1").value.trim(),note:$("bn1").value.trim()};
+ const sv=$("bs1").value;if(sv){if(prof.role=="MERCHANT")body.requirementId=+sv;else body.listingId=+sv;}
+ const r=await api("/api/appointments","POST",body);
+ b.textContent=r.ok?t("requestSent"):errMsg(r);
+}
+async function reportReview(id){
+ const reason=prompt(t("reportReason"));if(!reason||!reason.trim())return;
+ const r=await api("/api/reviews/"+id+"/report","POST",{reason:reason.trim()});
+ alert(r.ok?t("reported"):errMsg(r));
+}
+window.onLang=draw;
+initPage(["FARMER","MERCHANT"]).then(async ok=>{
+ if(!ok)return;
+ const id=new URLSearchParams(location.search).get("id");
+ const r=id?await api("/api/profiles/"+encodeURIComponent(id)):{ok:false};
+ prof=r.ok?r.data:null;draw();
+});
+</script></body></html>

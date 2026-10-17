@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroConnect - Register</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"></head><body>
+<header id="hdr"></header>
+<main class="auth">
+ <h1 data-i18n="register"></h1>
+ <div class="chips" style="margin-bottom:1rem">
+  <button type="button" class="chip on" id="rF" data-i18n="iFarmer"></button>
+  <button type="button" class="chip" id="rM" data-i18n="iMerchant"></button>
+ </div>
+ <form id="f" class="card" novalidate>
+  <div class="field"><label for="name" data-i18n="name"></label><input id="name" required></div>
+  <div class="field"><label for="phone" data-i18n="phone"></label><input id="phone" type="tel" inputmode="numeric" maxlength="10" required></div>
+  <div class="field"><label for="email" data-i18n="email"></label><input id="email" type="email" required></div>
+  <div class="field"><label for="pass" data-i18n="password"></label><input id="pass" type="password" minlength="8" autocomplete="new-password" required></div>
+  <div class="field"><label for="lg" data-i18n="language"></label>
+   <select id="lg" class="lang-select" style="width:100%" onchange="setLang(this.value)"><option value="en">English</option><option value="mr">मराठी</option><option value="hi">हिन्दी</option></select></div>
+  <div class="field"><label for="st" data-i18n="state"></label><input id="st" value="Maharashtra" required></div>
+  <div class="field"><label for="di" data-i18n="district"></label><input id="di" required></div>
+  <div class="field"><label for="ta" data-i18n="taluka"></label><input id="ta"></div>
+  <div class="field"><label for="vi" data-i18n="village"></label><input id="vi" required></div>
+  <div class="field"><label for="pin" data-i18n="pin"></label><input id="pin" inputmode="numeric" maxlength="6" required></div>
+  <div id="farmerFields" class="field"><label for="fn" data-i18n="farmName"></label><input id="fn"></div>
+  <div id="merchFields" class="hide">
+   <div class="field"><label for="bn" data-i18n="bizName"></label><input id="bn"></div>
+   <div class="field"><label for="bt" data-i18n="bizType"></label><input id="bt"></div>
+   <div class="field"><label for="bd" data-i18n="bizDesc"></label><textarea id="bd" rows="3"></textarea></div>
+  </div>
+  <button class="btn" type="submit" data-i18n="createAcc"></button>
+  <div id="msg" class="msg hide" role="alert"></div>
+ </form>
+ <p><a href="index.html" data-i18n="haveAcc"></a></p>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+let role="FARMER";
+function pick(r){role=r;
+  $("rF").classList.toggle("on",r=="FARMER");$("rM").classList.toggle("on",r=="MERCHANT");
+  $("farmerFields").classList.toggle("hide",r!="FARMER");$("merchFields").classList.toggle("hide",r!="MERCHANT");}
+$("rF").onclick=()=>pick("FARMER");$("rM").onclick=()=>pick("MERCHANT");
+function fail(key,el){$("msg").className="msg";$("msg").textContent=t(key);el.focus();}
+$("f").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const v=id=>$(id).value.trim();
+  for(const id of ["name","email","st","di","vi"]) if(!v(id)) return fail("required",$(id));
+  if(role=="MERCHANT"&&!v("bn")) return fail("required",$("bn"));
+  if(role=="MERCHANT"&&!v("bt")) return fail("required",$("bt"));
+  if(!/^[6-9]\d{9}$/.test(v("phone"))) return fail("phoneErr",$("phone"));
+  if($("pass").value.length<8) return fail("passErr",$("pass"));
+  if(!/^\d{6}$/.test(v("pin"))) return fail("pinErr",$("pin"));
+  const body={role,name:v("name"),phone:v("phone"),email:v("email"),password:$("pass").value,
+    preferredLanguage:$("lg").value.toUpperCase(),state:v("st"),district:v("di"),taluka:v("ta"),
+    villageOrCity:v("vi"),pinCode:v("pin")};
+  if(role=="FARMER") body.farmName=v("fn");
+  else{body.businessName=v("bn");body.businessType=v("bt");body.businessDescription=v("bd");}
+  const r=await api("/api/auth/register","POST",body);
+  if(r.ok){localStorage.setItem("lang",r.data.preferredLanguage.toLowerCase());location.href=homeFor(r.data.role);}
+  else{$("msg").className="msg";$("msg").textContent=errMsg(r);}
+});
+</script></body></html>

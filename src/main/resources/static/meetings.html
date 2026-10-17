@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><title>AgroConnect - Meetings</title></head><body>
+<header id="hdr" data-role="auto"></header>
+<main>
+ <h1 data-i18n="meetings"></h1>
+ <div id="flash" class="msg hide" role="alert"></div>
+ <div id="out"></div>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+let list=[];
+const isOpen=a=>a.status=="PENDING"||a.status=="RESCHEDULE_REQUESTED";
+function card(a){
+ const o=a.other;
+ return `<div class="card" style="margin-bottom:.7rem">
+  <div class="row" style="justify-content:space-between"><strong><a href="profile.html?id=${o.id}">${esc(o.displayName)}</a></strong>
+   <span class="badge">${t(STATUS[a.status])}</span></div>
+  <span class="muted">${esc(o.location)}</span>${a.category?" · "+esc(catName(a.category)):""}
+  <p>📅 ${esc(a.date)} ${esc(a.time.slice(0,5))}<br>📍 ${esc(a.meetingLocation)}${a.note?"<br>"+esc(a.note):""}</p>
+  ${a.otherPhone?`<p><strong>${t("phoneLbl")}:</strong> <a href="tel:${esc(a.otherPhone)}">${esc(a.otherPhone)}</a><br><span class="muted">${t("phoneShown")}</span></p>`
+    :`<p class="muted">${t("phoneHidden")}</p>`}
+  ${isOpen(a)&&a.proposedByMe?`<p class="muted">${t("waitingOther")}</p>`:""}
+  <div class="actions">
+   ${a.canRespond?`<button class="btn" onclick="act(${a.id},'respond',{action:'ACCEPT'})">${t("accept")}</button>
+     <button class="btn ghost" onclick="act(${a.id},'respond',{action:'REJECT'})">${t("reject")}</button>
+     <button class="btn ghost" onclick="$('rs${a.id}').classList.toggle('hide')">${t("suggestTime")}</button>`:""}
+   ${a.canComplete?`<button class="btn" onclick="act(${a.id},'complete')">${t("markDone")}</button>`:""}
+   ${a.canCancel?`<button class="btn ghost" onclick="if(confirm(t('confirmCancel')))act(${a.id},'cancel')">${t("cancelMeeting")}</button>`:""}
+  </div>
+  <div id="rs${a.id}" class="hide" style="margin-top:.6rem"><div class="formgrid">
+   <div><label>${t("date")}</label><input id="rd${a.id}" type="date" min="${todayStr()}"></div>
+   <div><label>${t("time")}</label><input id="rt${a.id}" type="time"></div>
+   <div><label>${t("meetPlace")}</label><input id="rl${a.id}" maxlength="200" value="${esc(a.meetingLocation)}"></div></div>
+   <button class="btn" style="margin-top:.5rem" onclick="reschedule(${a.id})">${t("sendRequest")}</button></div>
+ </div>`;
+}
+function group(title,items){return items.length?`<h2>${title}</h2>`+items.map(card).join(""):"";}
+function draw(){
+ if(!list.length){$("out").innerHTML=`<div class="empty">${t("emptyAppts")}</div>`;return;}
+ $("out").innerHTML=
+  group(t("needReplyTitle"),list.filter(a=>a.canRespond))+
+  group(t("waitingOther"),list.filter(a=>isOpen(a)&&a.proposedByMe))+
+  group(t("confirmedTitle"),list.filter(a=>a.status=="CONFIRMED"))+
+  group(t("pastTitle"),list.filter(a=>!isOpen(a)&&a.status!="CONFIRMED"));
+}
+function flash(msg){const f=$("flash");f.textContent=msg;f.className="msg";setTimeout(()=>f.className="msg hide",5000);}
+async function load(){const r=await api("/api/appointments");list=r.ok?r.data:[];draw();}
+async function act(id,what,body){
+ const r=await api(`/api/appointments/${id}/${what}`,"POST",body);
+ if(r.ok)load();else{flash(errMsg(r));load();}
+}
+function reschedule(id){
+ const d=$("rd"+id).value,tm=$("rt"+id).value;
+ if(!d||!tm){flash(t("required"));return;}
+ act(id,"respond",{action:"RESCHEDULE",date:d,time:tm,meetingLocation:$("rl"+id).value.trim()});
+}
+window.onLang=draw;
+initPage(["FARMER","MERCHANT"]).then(ok=>{if(ok)load();});
+</script></body></html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><title>AgroConnect - Deals & Payments</title></head><body>
+<header id="hdr" data-role="auto"></header>
+<main>
+ <div class="row" style="justify-content:space-between"><h1 data-i18n="dealsPay"></h1>
+  <button class="btn blue" id="newBtn" data-i18n="newDeal"></button></div>
+ <div id="flash" class="msg hide" role="alert"></div>
+ <div id="nform" class="tx hide" style="margin:.8rem 0">
+  <div class="formgrid">
+   <div><label for="nd_other" data-i18n="withWhom"></label><select id="nd_other"></select></div>
+   <div><label for="nd_cat" data-i18n="fruit"></label><select id="nd_cat"></select></div>
+   <div><label for="nd_qty" data-i18n="agreedQty"></label><input id="nd_qty" type="number" min="0" step="any"></div>
+   <div><label for="nd_unit" data-i18n="unit"></label><select id="nd_unit"></select></div>
+   <div><label for="nd_price" data-i18n="agreedPrice"></label><input id="nd_price" type="number" min="0" step="any"></div>
+  </div>
+  <p class="muted" data-i18n="priceExplain"></p>
+  <div class="field"><label for="nd_terms" data-i18n="terms"></label><textarea id="nd_terms" rows="2" maxlength="1000"></textarea></div>
+  <p><strong id="nd_est"></strong></p>
+  <p class="muted" id="nd_need"></p>
+  <button class="btn blue" id="nd_save" data-i18n="createDeal"></button>
+  <button class="btn ghost" id="nd_cancel" data-i18n="cancel"></button>
+  <div id="nd_msg" class="msg hide" role="alert"></div>
+ </div>
+ <div id="out"></div>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+let list=[],cands=[],cats=[];
+const METHODS=["UPI","BANK_TRANSFER","CASH","CHEQUE","OTHER"];
+const row2=(a,b)=>`<div class="kpi"><strong>${b}</strong>${a}</div>`;
+function flash(msg){const f=$("flash");f.textContent=msg;f.className="msg";setTimeout(()=>f.className="msg hide",6000);}
+
+const REQSTATUS={PENDING:"pending",ACCEPTED:"reqAccepted",REJECTED:"rejected",WITHDRAWN:"reqWithdrawn"};
+// Reject with an optional reason (Cancel in the prompt = do nothing)
+function decide(id,path){const r=prompt(t("reasonPrompt"));if(r===null)return;act(id,path,{reason:r.trim()});}
+function dealCard(d){
+ const s=d.summary,f=d.flags,id=d.id;
+ const supplyRows=d.supplies.map(x=>`<tr><td>${esc(x.deliveryDate)}</td><td>${fmtKg(x.quantityKg)}</td>
+  <td><span class="badge">${t(STATUS[x.status])}</span></td><td>${x.recordedByMe?t("you"):t("otherPerson")}</td>
+  <td>${x.canRespond?`<button class="btn blue" onclick="act(${id},'supplies/${x.id}/confirm')">${t("confirmDelivery")}</button>
+   <button class="btn ghost" onclick="act(${id},'supplies/${x.id}/reject')">${t("reject")}</button>`:""}${x.notes?" "+esc(x.notes):""}</td></tr>`).join("");
+ const payRows=d.payments.map(x=>`<tr><td>${esc(x.paymentDate)}</td><td>${rupee(x.amount)}</td><td>${t("m"+x.method)}</td>
+  <td>${esc(x.referenceNo||"")}</td><td><span class="badge">${t(STATUS[x.status])}</span></td><td>${x.recordedByMe?t("you"):t("otherPerson")}</td></tr>`).join("");
+ return `<div class="tx" style="margin-bottom:1.2rem">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0"><a href="profile.html?id=${d.other.id}">${esc(d.other.displayName)}</a> · ${esc(catName(d.category))}</h2>
+   <span class="badge">${t(STATUS[d.status])}</span></div>
+  <p class="muted">${esc(d.other.location)} · ${esc(d.agreementDate)}${d.terms?"<br>"+esc(d.terms):""}</p>
+  ${d.otherPhone?`<p><strong>${t("phoneLbl")}:</strong> <a href="tel:${esc(d.otherPhone)}">${esc(d.otherPhone)}</a></p>`:""}
+  ${d.status=="PENDING_CONFIRMATION"?(f.canConfirm
+    ?`<div class="card" style="margin:.6rem 0"><p><strong>${t("dealRequestToYou")}</strong></p>
+       <div class="actions"><button class="btn blue" onclick="act(${id},'confirm')">${t("accept")}</button>
+       <button class="btn ghost" onclick="decide(${id},'reject')">${t("reject")}</button></div></div>`
+    :`<p class="muted">${t("waitingToAcceptDeal")}</p>`):""}
+  ${f.completionPending?(f.canDecideCompletion
+    ?`<div class="card" style="margin:.6rem 0"><p><strong>${t("completionRequestToYou")}</strong></p>
+       <h3>${t("summaryTitle")}</h3>
+       <div class="kpis">${row2(t("agreedKgLbl"),fmtKg(d.agreedQuantityKg))}${row2(t("suppliedQty"),fmtKg(s.suppliedKg))}
+        ${row2(t("remainingQty"),fmtKg(s.remainingKg))}${row2(t("paidTotal"),rupee(s.paymentsTotal))}${row2(t("outstandingAmt"),rupee(s.outstanding))}</div>
+       <div class="actions"><button class="btn blue" onclick="act(${id},'completion/accept')">${t("acceptCompletion")}</button>
+       <button class="btn ghost" onclick="decide(${id},'completion/reject')">${t("rejectCompletion")}</button></div></div>`
+    :`<p class="muted">${t("waitingToAcceptCompletion")}</p>`):""}
+  <div class="actions">
+   ${f.canComplete?`<button class="btn blue" onclick="if(confirm(t('confirmRequestCompletion')))act(${id},'completion/request')">${t("requestCompletion")}</button>`:""}
+   ${f.canCancel&&!f.canConfirm?`<button class="btn ghost" onclick="if(confirm(t('confirmCancel')))act(${id},'cancel')">${t("cancelDeal")}</button>`:""}
+  </div>
+  ${d.requests&&d.requests.length?`<details style="margin:.5rem 0"><summary><strong>${t("requestsTitle")}</strong></summary>
+   ${d.requests.map(r=>`<p class="muted">${t(r.type=="COMPLETION"?"reqCompletion":"reqConfirmation")} · <strong>${t(REQSTATUS[r.status])}</strong>
+    · ${t("requestedByLbl")}: ${r.requestedByMe?t("you"):esc(r.requestedByName)} (${esc((r.requestedAt||"").replace("T"," ").slice(0,16))})
+    ${r.decidedByName?` · ${t("decidedByLbl")}: ${esc(r.decidedByName)} (${esc((r.decidedAt||"").replace("T"," ").slice(0,16))})`:""}
+    ${r.reason?` · ${t("reasonLbl")}: ${esc(r.reason)}`:""}</p>`).join("")}</details>`:""}
+  <h3>${t("fruitSection")}</h3>
+  <div class="kpis">${row2(t("agreedKgLbl"),fmtKg(d.agreedQuantityKg))}${row2(t("suppliedQty"),fmtKg(s.suppliedKg))}
+   ${row2(t("pendingQty"),fmtKg(s.pendingKg))}${row2(t("remainingQty"),fmtKg(s.remainingKg))}</div>
+  ${d.supplies.length?`<div class="wrap"><table><tr><th>${t("date")}</th><th>${t("qty")}</th><th>${t("status")}</th><th>${t("recordedBy")}</th><th></th></tr>${supplyRows}</table></div>`:""}
+  ${f.canRecordSupply?`<details style="margin-top:.5rem"><summary><strong>${t("recordDelivery")}</strong></summary><div class="formgrid" style="margin-top:.5rem">
+    <div><label>${t("deliveryDate")}</label><input id="sd${id}" type="date" max="${todayStr()}" value="${todayStr()}"></div>
+    <div><label>${t("qty")}</label><input id="sq${id}" type="number" min="0" step="any"></div>
+    <div><label>${t("unit")}</label><select id="su${id}"><option value="kg">${t("kg")}</option><option value="tons">${t("tons")}</option></select></div>
+    <div><label>${t("notes")}</label><input id="sn${id}" maxlength="300"></div></div>
+    <button class="btn blue" style="margin-top:.5rem" onclick="recordSupply(${id})">${t("save")}</button></details>`:""}
+  <h3>${t("moneySection")}</h3>
+  <div class="kpis">${row2(t("totalValue"),rupee(d.totalValue))}${row2(t("agreedPrice"),rupee(d.agreedPricePerKg)+"/"+t("kg"))}
+   ${row2(t("valueSupplied"),rupee(s.valueSupplied))}${row2(t("paidTotal"),rupee(s.paymentsTotal))}${row2(t("outstandingAmt"),rupee(s.outstanding))}</div>
+  ${d.payments.length?`<div class="wrap"><table><tr><th>${t("date")}</th><th>${t("amount")}</th><th>${t("method")}</th><th>${t("reference")}</th><th>${t("status")}</th><th>${t("recordedBy")}</th></tr>${payRows}</table></div>`:""}
+  <p class="muted">${t("payDisclaimer")}</p>
+  ${f.canRecordPayment?`<details><summary><strong>${t("recordPayment")}</strong></summary><div class="formgrid" style="margin-top:.5rem">
+    <div><label>${t("payDate")}</label><input id="pd${id}" type="date" max="${todayStr()}" value="${todayStr()}"></div>
+    <div><label>${t("amount")}</label><input id="pa${id}" type="number" min="0" step="any"></div>
+    <div><label>${t("method")}</label><select id="pm${id}">${METHODS.map(m=>`<option value="${m}">${t("m"+m)}</option>`).join("")}</select></div>
+    <div><label>${t("reference")}</label><input id="pr${id}" maxlength="100"></div>
+    <div><label>${t("notes")}</label><input id="pn${id}" maxlength="300"></div></div>
+    <button class="btn blue" style="margin-top:.5rem" onclick="recordPayment(${id})">${t("save")}</button></details>`:""}
+  ${f.canReview?`<details style="margin-top:.6rem"><summary><strong>${t("rateTitle")}</strong></summary><div class="formgrid" style="margin-top:.5rem">
+    <div><label>${t("ratingLbl")}</label><select id="rr${id}">${[5,4,3,2,1].map(n=>`<option value="${n}">${"★".repeat(n)}</option>`).join("")}</select></div>
+    <div><label>${t("comment")}</label><input id="rc${id}" maxlength="500"></div></div>
+    <button class="btn" style="margin-top:.5rem" onclick="submitReview(${id})">${t("submitReview")}</button></details>`:""}
+  ${f.reviewed?`<p class="muted">${t("reviewedMsg")}</p>`:""}
+ </div>`;
+}
+function draw(){$("out").innerHTML=list.length?list.map(dealCard).join(""):`<div class="empty">${t("emptyDeals")}</div>`;}
+async function load(){const r=await api("/api/deals");list=r.ok?r.data:[];draw();}
+async function act(id,path,body){
+ const r=await api(`/api/deals/${id}/${path}`,"POST",body);
+ if(!r.ok)flash(errMsg(r));
+ load();
+}
+function recordSupply(id){
+ const q=+$("sq"+id).value;if(!$("sd"+id).value||!(q>0)){flash(t("required"));return;}
+ act(id,"supplies",{deliveryDate:$("sd"+id).value,quantityKg:qtyToKg(q,$("su"+id).value),notes:$("sn"+id).value.trim()});
+}
+function recordPayment(id){
+ const a=+$("pa"+id).value;if(!$("pd"+id).value||!(a>0)){flash(t("required"));return;}
+ act(id,"payments",{paymentDate:$("pd"+id).value,amount:a,method:$("pm"+id).value,referenceNo:$("pr"+id).value.trim(),notes:$("pn"+id).value.trim()});
+}
+function submitReview(id){act(id,"review",{rating:+$("rr"+id).value,comment:$("rc"+id).value.trim()});}
+
+// ---------- new deal form
+function fillForm(){
+ const keep=["nd_other","nd_cat","nd_unit"].map(i=>$(i).value);
+ $("nd_other").innerHTML=cands.map(c=>`<option value="${c.other.id}" data-cat="${c.category?c.category.id:""}">${esc(c.other.displayName)}${c.category?" · "+esc(catName(c.category)):""}</option>`).join("");
+ $("nd_cat").innerHTML=cats.map(c=>`<option value="${c.id}">${esc(catName(c))}</option>`).join("");
+ $("nd_unit").innerHTML=`<option value="kg">${t("kg")}</option><option value="tons">${t("tons")}</option>`;
+ ["nd_other","nd_cat","nd_unit"].forEach((i,k)=>{if(keep[k])$(i).value=keep[k];});
+ $("nd_need").textContent=cands.length?"":t("needMeeting");$("nd_save").disabled=!cands.length;
+}
+function estimate(){
+ const q=qtyToKg(+$("nd_qty").value,$("nd_unit").value),p=+$("nd_price").value;
+ $("nd_est").textContent=q>0&&p>0?t("estTotal")+": "+rupee(Math.round(q*p*100)/100):"";
+}
+$("newBtn").onclick=()=>{fillForm();$("nform").classList.toggle("hide");};
+$("nd_cancel").onclick=()=>$("nform").classList.add("hide");
+["nd_qty","nd_unit","nd_price"].forEach(i=>$(i).addEventListener("input",estimate));
+$("nd_other").addEventListener("change",()=>{const o=$("nd_other").selectedOptions[0];if(o&&o.dataset.cat)$("nd_cat").value=o.dataset.cat;});
+$("nd_save").onclick=async()=>{
+ const m=$("nd_msg");m.className="msg";
+ const q=+$("nd_qty").value,p=+$("nd_price").value;
+ if(!$("nd_other").value||!$("nd_cat").value||!(q>0)||!(p>0)){m.textContent=t("required");return;}
+ const r=await api("/api/deals","POST",{otherUserId:+$("nd_other").value,categoryId:+$("nd_cat").value,
+  agreedQuantityKg:qtyToKg(q,$("nd_unit").value),agreedPricePerKg:p,terms:$("nd_terms").value.trim()});
+ if(r.ok){m.className="msg hide";$("nform").classList.add("hide");["nd_qty","nd_price","nd_terms"].forEach(i=>$(i).value="");$("nd_est").textContent="";load();}
+ else m.textContent=errMsg(r);
+};
+window.onLang=()=>{fillForm();estimate();draw();};
+initPage(["FARMER","MERCHANT"]).then(async ok=>{
+ if(!ok)return;
+ const [a,c]=await Promise.all([api("/api/appointments"),api("/api/categories")]);
+ if(c.ok)cats=c.data;
+ const seen=new Set();
+ cands=(a.ok?a.data:[]).filter(x=>(x.status=="CONFIRMED"||x.status=="COMPLETED")&&!seen.has(x.other.id)&&seen.add(x.other.id));
+ fillForm();load();
+});
+</script></body></html>

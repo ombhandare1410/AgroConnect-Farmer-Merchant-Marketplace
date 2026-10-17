@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Illustrated avatar">
+<rect width="200" height="200" rx="28" fill="#E8F0E5"/>
+<path d="M30 200c0-38 30-62 70-62s70 24 70 62z" fill="#2E8B57"/>
+<rect x="88" y="112" width="24" height="30" rx="10" fill="#C98F66"/>
+<circle cx="100" cy="86" r="38" fill="#C98F66"/>
+<path d="M62 84c-2-30 18-46 40-44 22 2 38 18 36 44-8-14-20-22-38-22s-30 8-38 22z" fill="#2B2118"/>
+<circle cx="86" cy="90" r="3.5" fill="#2a2a2a"/><circle cx="114" cy="90" r="3.5" fill="#2a2a2a"/>
+<path d="M88 106q12 9 24 0" stroke="#2a2a2a" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>

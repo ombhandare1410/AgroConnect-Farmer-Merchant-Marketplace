@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><title>AgroConnect - Admin</title></head><body>
+<header id="hdr" data-role="admin"></header>
+<main>
+ <h1 data-i18n="adminTitle"></h1>
+ <div id="aflash" class="msg hide" role="alert"></div>
+ <h2 data-i18n="adminSummary"></h2>
+ <div id="sum" class="kpis"></div>
+ <h2 data-i18n="categories"></h2>
+ <div class="card">
+  <div class="filters">
+   <div><label for="cn" data-i18n="nameEn"></label><input id="cn"></div>
+   <div><label for="cm" data-i18n="nameMr"></label><input id="cm"></div>
+   <div><label for="ch" data-i18n="nameHi"></label><input id="ch"></div>
+  </div>
+  <button class="btn" id="add" data-i18n="addCategory"></button>
+  <div id="msg" class="msg hide" role="alert"></div>
+ </div>
+ <div class="wrap" style="margin-top:.8rem"><table><thead><tr><th>English</th><th>मराठी</th><th>हिन्दी</th><th data-i18n="status"></th><th></th></tr></thead><tbody id="catBody"></tbody></table></div>
+ <h2 data-i18n="users"></h2>
+ <div class="filters">
+  <div><label for="us" data-i18n="searchUsers"></label><input id="us" autocomplete="off"></div>
+  <div><label for="ur" data-i18n="role"></label><select id="ur"></select></div>
+ </div>
+ <div class="wrap"><table><thead><tr><th data-i18n="name"></th><th data-i18n="role"></th><th data-i18n="email"></th>
+  <th data-i18n="phone"></th><th data-i18n="location"></th><th data-i18n="status"></th><th></th></tr></thead><tbody id="userBody"></tbody></table></div>
+ <h2 data-i18n="reports"></h2>
+ <div id="reps"></div>
+ <details style="margin-top:1rem"><summary><strong data-i18n="auditTitle"></strong></summary>
+  <div class="wrap"><table><thead><tr><th data-i18n="whenLbl"></th><th data-i18n="byLbl"></th><th data-i18n="actionLbl"></th>
+   <th data-i18n="targetLbl"></th><th></th></tr></thead><tbody id="aud"></tbody></table></div></details>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+let cats=[];
+function draw(){
+ $("catBody").innerHTML=cats.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.nameMr)}</td><td>${esc(c.nameHi)}</td>
+  <td><span class="badge">${t(c.active?"active":"inactive")}</span></td>
+  <td><button class="btn ghost" onclick="toggle(${c.id})">${t(c.active?"deactivate":"activate")}</button></td></tr>`).join("");
+}
+async function load(){const r=await api("/api/admin/categories");if(r.ok){cats=r.data;draw();}}
+async function toggle(id){
+ const c=cats.find(x=>x.id==id);
+ const r=await api("/api/admin/categories/"+id,"PUT",{name:c.name,nameMr:c.nameMr,nameHi:c.nameHi,active:!c.active});
+ if(r.ok)load();else{$("msg").className="msg";$("msg").textContent=errMsg(r);}
+}
+$("add").onclick=async()=>{
+ const m=$("msg");m.className="msg";
+ if(!$("cn").value.trim()){m.textContent=t("required");return;}
+ const r=await api("/api/admin/categories","POST",{name:$("cn").value.trim(),nameMr:$("cm").value.trim(),nameHi:$("ch").value.trim()});
+ if(r.ok){["cn","cm","ch"].forEach(i=>$(i).value="");m.className="msg hide";load();}else m.textContent=errMsg(r);
+};
+// ---------- Phase 7: users, reports, audit log, summary
+let users=[],reps=[],audit=[],summary=null;
+const dt=s=>esc((s||"").replace("T"," ").slice(0,16));
+function aflash(msg){const f=$("aflash");f.textContent=msg;f.className="msg";setTimeout(()=>f.className="msg hide",6000);}
+function drawSummary(){
+ if(!summary){$("sum").innerHTML="";return;}
+ const k=(l,v)=>`<div class="kpi"><strong>${v}</strong>${t(l)}</div>`;
+ $("sum").innerHTML=k("kFarmers",summary.farmers)+k("kMerchants",summary.merchants)+k("kActiveDeals",summary.activeDeals)+
+  k("kCompletedDeals",summary.completedDeals)+k("kOpenReports",summary.openComplaints);
+}
+function drawUsers(){
+ const keep=$("ur").value;
+ $("ur").innerHTML=`<option value="">${t("any")}</option><option value="FARMER">${t("farmer")}</option><option value="MERCHANT">${t("merchant")}</option>`;
+ $("ur").value=keep;
+ const q=$("us").value.trim().toLowerCase(),ro=$("ur").value;
+ const rows=users.filter(u=>(!ro||u.role==ro)&&(!q||(u.name+" "+(u.businessName||"")+" "+u.email).toLowerCase().includes(q)));
+ $("userBody").innerHTML=rows.length?rows.map(u=>`<tr><td>${esc(u.name)}${u.businessName?"<br><span class='muted'>"+esc(u.businessName)+"</span>":""}</td>
+  <td>${t(u.role=="FARMER"?"farmer":"merchant")}</td><td>${esc(u.email)}</td><td>${esc(u.phone)}</td><td>${esc(u.location)}</td>
+  <td><span class="badge">${t(u.active?"active":"inactive")}</span></td>
+  <td><button class="btn ghost" onclick="setActive(${u.id},${!u.active})">${t(u.active?"deactivate":"activate")}</button></td></tr>`).join("")
+  :`<tr><td colspan="7"><div class="empty">${t("emptyUsers")}</div></td></tr>`;
+}
+function drawReps(){
+ $("reps").innerHTML=reps.length?reps.map(c=>`<div class="card" style="margin-bottom:.7rem">
+  <div class="row" style="justify-content:space-between"><strong>${t("reportedBy")}: ${esc(c.reporterName)}</strong><span class="badge">${t("c"+c.status)}</span></div>
+  <p>${t("reasonLbl")}: ${esc(c.reason)}</p>
+  ${c.reviewId?`<p class="muted">${t("reportedReview")}: <span class="stars">${"★".repeat(c.reviewRating)}${"☆".repeat(5-c.reviewRating)}</span>
+    ${esc(c.reviewComment||"")} ${c.reviewHidden?`<span class="badge">${t("hiddenBadge")}</span>`:""}</p>`:""}
+  ${c.adminNote?`<p class="muted">${t("adminNoteLbl")}: ${esc(c.adminNote)}</p>`:""}
+  <div class="actions">
+   ${c.status=="OPEN"?`<button class="btn" onclick="resolveRep(${c.id},'HIDE_REVIEW')">${t("hideReview")}</button>
+    <button class="btn ghost" onclick="resolveRep(${c.id},'DISMISS')">${t("dismissReport")}</button>
+    <button class="btn ghost" onclick="resolveRep(${c.id},'RESOLVE')">${t("markResolved")}</button>`:""}
+   ${c.reviewHidden?`<button class="btn ghost" onclick="resolveRep(${c.id},'RESTORE_REVIEW')">${t("restoreReview")}</button>`:""}
+  </div></div>`).join(""):`<div class="empty">${t("emptyReports")}</div>`;
+}
+function drawAudit(){
+ $("aud").innerHTML=audit.map(a=>`<tr><td>${dt(a.createdAt)}</td><td>${esc(a.actorName)}</td><td>${t("a"+a.action)}</td>
+  <td>${esc(a.targetType)} #${a.targetId||""}</td><td>${esc(a.details||"")}</td></tr>`).join("");
+}
+async function loadSummary(){const r=await api("/api/admin/summary");if(r.ok){summary=r.data;drawSummary();}}
+async function loadUsers(){const r=await api("/api/admin/users");if(r.ok){users=r.data;drawUsers();}}
+async function loadReps(){const r=await api("/api/admin/complaints");if(r.ok){reps=r.data;drawReps();}}
+async function loadAudit(){const r=await api("/api/admin/audit");if(r.ok){audit=r.data;drawAudit();}}
+async function setActive(id,active){
+ if(!active&&!confirm(t("confirmDeactivate")))return;
+ const r=await api(`/api/admin/users/${id}/active`,"PUT",{active});
+ if(r.ok){loadUsers();loadAudit();}else aflash(errMsg(r));
+}
+async function resolveRep(id,action){
+ const note=prompt(t("adminNotePrompt"));if(note===null)return;
+ const r=await api(`/api/admin/complaints/${id}/resolve`,"POST",{action,adminNote:note.trim()});
+ if(r.ok){loadReps();loadAudit();loadSummary();}else{aflash(errMsg(r));loadReps();}
+}
+["us","ur"].forEach(i=>$(i).addEventListener("input",drawUsers));
+window.onLang=()=>{draw();drawSummary();drawUsers();drawReps();drawAudit();};
+initPage("ADMIN").then(ok=>{if(ok){load();loadSummary();loadUsers();loadReps();loadAudit();}});
+</script></body></html>

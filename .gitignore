@@ -1,0 +1,23 @@
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Java / Maven
+target/
+*.class
+
+# IDE and operating system
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local uploads and logs
+uploads/
+*.log
+
+# Local configuration containing secrets
+application-local.properties

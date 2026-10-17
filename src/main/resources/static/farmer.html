@@ -1,0 +1,171 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><title>AgroConnect - Farmer</title></head><body>
+<header id="hdr" data-role="farmer"></header>
+<main>
+ <h1 data-i18n="welcome"></h1>
+ <p class="muted" id="who"></p>
+ <div id="flash" class="msg hide" role="status"></div>
+
+ <h2 data-i18n="appts"></h2><div id="mtg"></div>
+ <div class="tx" style="margin-top:1rem"><h2 data-i18n="activeDeals"></h2><div id="dls"></div></div>
+
+ <section id="find">
+  <h2 data-i18n="chooseFruit"></h2>
+  <div class="chips" id="chips"></div>
+  <div class="filters">
+   <div><label for="fl" data-i18n="location"></label><input id="fl" placeholder="Nashik"></div>
+   <div><label for="fq" data-i18n="minQty"></label><input id="fq" type="number" min="0"></div>
+   <div><label for="fp" data-i18n="minPrice"></label><input id="fp" type="number" min="0"></div>
+   <div><label for="fr" data-i18n="minRating"></label>
+    <select id="fr"><option value="" data-i18n="any"></option><option value="3">3 ★</option><option value="4">4 ★</option></select></div>
+  </div>
+  <h2 data-i18n="recommended"></h2>
+  <div id="list" class="grid"></div>
+ </section>
+
+ <section id="myfruits">
+  <div class="row" style="justify-content:space-between;margin-top:1.6rem"><h2 data-i18n="myFruits" style="margin:0"></h2>
+   <button class="btn" id="addBtn" data-i18n="addListing"></button></div>
+  <div id="lform" class="card hide" style="margin:.8rem 0">
+   <div class="formgrid">
+    <div><label for="lcat" data-i18n="fruit"></label><select id="lcat"></select></div>
+    <div><label for="lvar" data-i18n="variety"></label><input id="lvar" maxlength="80"></div>
+    <div><label for="lqty" data-i18n="qty"></label><input id="lqty" type="number" min="0" step="any"></div>
+    <div><label for="lunit" data-i18n="unit"></label><select id="lunit"></select></div>
+    <div><label for="lprice" data-i18n="priceExp"></label><input id="lprice" type="number" min="0" step="any"></div>
+    <div><label for="lgrade" data-i18n="quality"></label><select id="lgrade"></select></div>
+    <div><label for="lavail" data-i18n="availFrom"></label><input id="lavail" type="date"></div>
+    <div><label for="lstatus" data-i18n="status"></label><select id="lstatus"></select></div>
+   </div>
+   <p class="muted" data-i18n="priceNote"></p>
+   <div class="field"><label for="ldesc" data-i18n="notes"></label><textarea id="ldesc" rows="2" maxlength="500"></textarea></div>
+   <div class="field"><label for="lphotos" data-i18n="photos"></label><input id="lphotos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+    <div id="lexist" class="thumbs"></div></div>
+   <p class="muted" data-i18n="locNote"></p>
+   <button class="btn" id="saveBtn" data-i18n="save"></button>
+   <button class="btn ghost" id="cancelBtn" data-i18n="cancel"></button>
+   <div id="lmsg" class="msg hide" role="alert"></div>
+  </div>
+  <div id="mine" class="grid"></div>
+ </section>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+let cats=[],sel=null,mine=[],editing=null,merchants=[];
+
+// ================= Find merchants (real data from /api/discover/merchants)
+async function loadMerchants(){
+ if(!sel){merchants=[];draw();return;}
+ const p=new URLSearchParams({categoryId:sel.id});
+ if($("fl").value.trim())p.set("location",$("fl").value.trim());
+ if($("fq").value)p.set("minQty",$("fq").value);
+ if($("fp").value)p.set("minPrice",$("fp").value);
+ if($("fr").value)p.set("minRating",$("fr").value);
+ const r=await api("/api/discover/merchants?"+p);
+ merchants=r.ok?r.data:[];draw();
+}
+function draw(){
+ $("chips").innerHTML=cats.map(c=>`<button class="chip ${sel&&c.id==sel.id?"on":""}" onclick="pickCat(${c.id})">${esc(catName(c))}</button>`).join("");
+ $("list").innerHTML=merchants.length?merchants.map(m=>`
+  <div class="card"><div class="row"><div class="avatar">${esc(initials(m.businessName||"?"))}</div>
+   <div><strong>${esc(m.businessName)}</strong><br><span class="muted">${esc(m.location)}</span></div></div>
+   <p><span class="badge ${m.matchRank<=3?"near":""}">${t("lvl"+m.matchLevel)}</span></p>
+   <p>${t("wants")}: <strong>${esc(catName(m.category))}</strong>${m.variety?" ("+esc(m.variety)+")":""}<br>
+   ${t("qty")}: ${fmtKg(m.quantityKg)}<br>${t("target")}: ${price(m.targetPriceMin,m.targetPriceMax)}
+   ${m.qualityGrade?"<br>"+t("quality")+": "+esc(m.qualityGrade):""}</p>
+   <p>${m.avgRating==null?t("noRatings"):stars(m.avgRating)+" ("+m.reviewCount+" "+t("reviews")+")"}<br>
+   <span class="muted">${m.completedDeals} ${t("deals")} · ${Number(m.totalKgPurchased).toLocaleString("en-IN")} ${t("kg")} ${t("purchased")}</span></p>
+   <a class="btn ghost" href="profile.html?id=${m.merchantId}">${t("viewProfile")}</a></div>`).join("")
+  :`<div class="empty" style="grid-column:1/-1">${t("emptyMerchants")}</div>`;
+}
+function pickCat(id){sel=cats.find(c=>c.id==id);loadMerchants();}
+
+// ================= My fruit listings
+function flash(msg){const f=$("flash");f.textContent=msg;f.className="msg";setTimeout(()=>f.className="msg hide",5000);}
+function fillSelects(){
+ const keep=["lcat","lunit","lstatus","lgrade"].map(i=>$(i).value);
+ $("lcat").innerHTML=cats.map(c=>`<option value="${c.id}">${esc(catName(c))}</option>`).join("");
+ $("lunit").innerHTML=`<option value="kg">${t("kg")}</option><option value="tons">${t("tons")}</option>`;
+ $("lstatus").innerHTML=["ACTIVE","PAUSED","SOLD_OUT"].map(s=>`<option value="${s}">${t(STATUS[s])}</option>`).join("");
+ $("lgrade").innerHTML='<option value="">—</option><option>A</option><option>B</option><option>C</option>';
+ ["lcat","lunit","lstatus","lgrade"].forEach((i,k)=>{if(keep[k])$(i).value=keep[k];});
+}
+function drawMine(){
+ $("mine").innerHTML=mine.length?mine.map(l=>`
+  <div class="card"><strong>${esc(catName(l.category))}</strong>${l.variety?" · "+esc(l.variety):""}
+   <span class="badge">${t(STATUS[l.status])}</span>${thumbs(l.images)}
+   <p>${t("qty")}: ${fmtKg(l.quantityKg)}<br>${t("expected")}: ₹${l.expectedPricePerKg}/${t("kg")}
+   ${l.qualityGrade?"<br>"+t("quality")+": "+esc(l.qualityGrade):""}</p>
+   <div class="actions">
+    <button class="btn ghost" onclick="openForm(${l.id})">${t("edit")}</button>
+    ${l.status=="ACTIVE"?`<button class="btn ghost" onclick="setStatus(${l.id},'PAUSED')">${t("pause")}</button>`
+      :`<button class="btn ghost" onclick="setStatus(${l.id},'ACTIVE')">${t("resume")}</button>`}
+    ${l.status!="SOLD_OUT"?`<button class="btn ghost" onclick="setStatus(${l.id},'SOLD_OUT')">${t("markSold")}</button>`:""}
+    <button class="btn ghost" onclick="removeListing(${l.id})">${t("remove")}</button>
+   </div></div>`).join("")
+  :`<div class="empty" style="grid-column:1/-1">${t("emptyListings")}</div>`;
+}
+async function loadMine(){const r=await api("/api/listings/mine");if(r.ok){mine=r.data;drawMine();}}
+function bodyOf(l,status){
+ return{categoryId:l.category.id,variety:l.variety,quantityKg:l.quantityKg,expectedPricePerKg:l.expectedPricePerKg,
+  qualityGrade:l.qualityGrade,availableFrom:l.availableFrom,state:l.state,district:l.district,taluka:l.taluka,
+  villageOrCity:l.villageOrCity,description:l.description,status};
+}
+async function setStatus(id,status){
+ const l=mine.find(x=>x.id==id);const r=await api("/api/listings/"+id,"PUT",bodyOf(l,status));
+ if(r.ok)loadMine();else flash(errMsg(r));
+}
+async function removeListing(id){
+ if(!confirm(t("confirmRemove")))return;
+ const r=await api("/api/listings/"+id,"DELETE");
+ if(r.ok||r.status==204)loadMine();else flash(errMsg(r));
+}
+function showExisting(){
+ const l=editing&&mine.find(x=>x.id==editing);
+ $("lexist").innerHTML=l?l.images.map(i=>`<span class="rm"><img src="${esc(i.url)}" alt=""><button type="button" onclick="delPhoto(${l.id},${i.id})" aria-label="${t("remove")}">×</button></span>`).join(""):"";
+}
+async function delPhoto(lid,iid){
+ const r=await api(`/api/listings/${lid}/images/${iid}`,"DELETE");
+ if(r.ok){await loadMine();showExisting();}else flash(errMsg(r));
+}
+function openForm(id){
+ editing=id||null;const l=editing&&mine.find(x=>x.id==id);fillSelects();
+ $("lcat").value=l?l.category.id:(sel?sel.id:cats[0]&&cats[0].id);
+ $("lvar").value=l?l.variety||"":"";$("lqty").value=l?l.quantityKg:"";$("lunit").value="kg";
+ $("lprice").value=l?l.expectedPricePerKg:"";$("lgrade").value=l?l.qualityGrade||"":"";
+ $("lavail").value=l?l.availableFrom||"":"";$("lstatus").value=l?l.status:"ACTIVE";
+ $("ldesc").value=l?l.description||"":"";$("lphotos").value="";$("lmsg").className="msg hide";
+ showExisting();$("lform").classList.remove("hide");$("lform").scrollIntoView({behavior:"smooth"});
+}
+function closeForm(){editing=null;$("lform").classList.add("hide");}
+async function saveListing(){
+ const m=$("lmsg");m.className="msg";
+ const qty=+$("lqty").value,pr=+$("lprice").value;
+ if(!$("lcat").value||!(qty>0)||!(pr>0)){m.textContent=t("required");return;}
+ const body={categoryId:+$("lcat").value,variety:$("lvar").value.trim(),quantityKg:qtyToKg(qty,$("lunit").value),
+  expectedPricePerKg:pr,qualityGrade:$("lgrade").value,availableFrom:$("lavail").value||null,
+  description:$("ldesc").value.trim(),status:$("lstatus").value};
+ if(editing){const l=mine.find(x=>x.id==editing);Object.assign(body,{state:l.state,district:l.district,taluka:l.taluka,villageOrCity:l.villageOrCity});}
+ const r=editing?await api("/api/listings/"+editing,"PUT",body):await api("/api/listings","POST",body);
+ if(!r.ok){m.textContent=errMsg(r);return;}
+ let failed=false;
+ for(const f of $("lphotos").files){
+  const fd=new FormData();fd.append("file",f);
+  const u=await fetch("/api/listings/"+r.data.id+"/images",{method:"POST",body:fd,credentials:"same-origin"});
+  if(!u.ok)failed=true;
+ }
+ closeForm();await loadMine();flash(failed?t("photoFail"):t("saved"));
+}
+$("addBtn").onclick=()=>openForm();$("saveBtn").onclick=saveListing;$("cancelBtn").onclick=closeForm;
+const reload=deb(loadMerchants);["fl","fq","fp","fr"].forEach(i=>$(i).addEventListener("input",reload));
+window.onLang=()=>{fillSelects();draw();drawMine();mtgSummary.draw();dealsSummary.draw();};
+
+initPage("FARMER").then(async ok=>{
+ if(!ok)return;
+ $("who").textContent=t("hello")+", "+me.name+" · "+me.villageOrCity+", "+me.district;
+ const r=await api("/api/categories");
+ if(r.ok){cats=r.data;sel=cats.find(c=>c.name=="Grapes")||cats[0]||null;}
+ fillSelects();draw();loadMerchants();loadMine();mtgSummary.load();dealsSummary.load();
+});
+</script></body></html>

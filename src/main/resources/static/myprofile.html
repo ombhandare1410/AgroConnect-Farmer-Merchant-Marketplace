@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><title>AgroConnect - My Profile</title></head><body>
+<header id="hdr" data-role="auto"></header>
+<main class="auth" style="max-width:640px">
+ <h1 data-i18n="profileTitle"></h1>
+ <div id="flash" class="msg hide" role="status"></div>
+ <form id="f" class="card" novalidate>
+  <div class="field"><label for="em" data-i18n="emailFixed"></label><input id="em" disabled></div>
+  <div class="field"><label for="name" data-i18n="name"></label><input id="name" required></div>
+  <div class="field"><label for="phone" data-i18n="phone"></label><input id="phone" type="tel" inputmode="numeric" maxlength="10" required></div>
+  <div class="field"><label for="st" data-i18n="state"></label><input id="st" required></div>
+  <div class="field"><label for="di" data-i18n="district"></label><input id="di" required></div>
+  <div class="field"><label for="ta" data-i18n="taluka"></label><input id="ta"></div>
+  <div class="field"><label for="vi" data-i18n="village"></label><input id="vi" required></div>
+  <div class="field"><label for="pin" data-i18n="pin"></label><input id="pin" inputmode="numeric" maxlength="6" required></div>
+  <div id="farmerFields" class="field hide"><label for="fn" data-i18n="farmName"></label><input id="fn"></div>
+  <div id="merchFields" class="hide">
+   <div class="field"><label for="bn" data-i18n="bizName"></label><input id="bn"></div>
+   <div class="field"><label for="bt" data-i18n="bizType"></label><input id="bt"></div>
+   <div class="field"><label for="bd" data-i18n="bizDesc"></label><textarea id="bd" rows="3" maxlength="500"></textarea></div>
+  </div>
+  <button class="btn" type="submit" data-i18n="save"></button>
+  <div id="msg" class="msg hide" role="alert"></div>
+ </form>
+</main>
+<script src="js/translations.js"></script><script src="js/app.js"></script>
+<script>
+function fill(){
+ $("em").value=me.email;$("name").value=me.name;$("phone").value=me.phone;$("st").value=me.state;$("di").value=me.district;
+ $("ta").value=me.taluka||"";$("vi").value=me.villageOrCity;$("pin").value=me.pinCode;
+ $("fn").value=me.farmName||"";$("bn").value=me.businessName||"";$("bt").value=me.businessType||"";$("bd").value=me.businessDescription||"";
+ $("farmerFields").classList.toggle("hide",me.role!="FARMER");$("merchFields").classList.toggle("hide",me.role!="MERCHANT");
+}
+function fail(key,el){$("msg").className="msg";$("msg").textContent=t(key);el.focus();}
+$("f").addEventListener("submit",async e=>{
+ e.preventDefault();const v=id=>$(id).value.trim();
+ for(const id of ["name","st","di","vi"]) if(!v(id)) return fail("required",$(id));
+ if(me.role=="MERCHANT"&&(!v("bn")||!v("bt"))) return fail("required",$(v("bn")?"bt":"bn"));
+ if(!/^[6-9]\d{9}$/.test(v("phone"))) return fail("phoneErr",$("phone"));
+ if(!/^\d{6}$/.test(v("pin"))) return fail("pinErr",$("pin"));
+ const body={name:v("name"),phone:v("phone"),state:v("st"),district:v("di"),taluka:v("ta"),villageOrCity:v("vi"),pinCode:v("pin")};
+ if(me.role=="FARMER")body.farmName=v("fn");else{body.businessName=v("bn");body.businessType=v("bt");body.businessDescription=v("bd");}
+ const r=await api("/api/profile","PUT",body);
+ if(r.ok){me=r.data;$("msg").className="msg hide";const f=$("flash");f.textContent=t("saved");f.className="msg";setTimeout(()=>f.className="msg hide",4000);}
+ else{$("msg").className="msg";$("msg").textContent=errMsg(r);}
+});
+initPage(["FARMER","MERCHANT"]).then(ok=>{if(ok)fill();});
+</script></body></html>
